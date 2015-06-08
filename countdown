@@ -1,0 +1,76 @@
+#!/usr/bin/python
+
+from PyQt4.QtGui import *
+from PyQt4.QtCore import *
+import PyTango
+import time
+
+
+class MyMainWindow(QMainWindow):
+
+    def __init__(self, parent=None):
+        self.equal = False
+
+        attr1 = "MACH/CT/GATEWAY/TopUpRemaining"
+        attr2 = "MACH/CT/GATEWAY/TopUpWarmupBooster"
+        attr3 = "MACH/CT/GATEWAY/TopUpWarmupLinac"
+
+        attr_topup = "MACH/CT/GATEWAY/TopUpEnabled"
+        self.topupenabledattr = PyTango.AttributeProxy(attr_topup)
+        self.topup = self.topupenabledattr.read().value
+
+        self.remaining = PyTango.AttributeProxy(attr1)
+        self.warmupbooster = PyTango.AttributeProxy(attr2)
+        self.warmuplinac = PyTango.AttributeProxy(attr3)
+
+        self.val1 = self.remaining.read().value
+        self.val2 = self.warmupbooster.read().value
+        self.val3 = self.warmuplinac.read().value
+        self.remaining_total = self.val1 + self.val2 + self.val3  
+
+        QMainWindow.__init__(self, parent)
+
+        self.central = QWidget(self)
+        self.hbox = QHBoxLayout(self.central)
+        self.lcd = QLCDNumber(self.central)
+        self.timer = QTimer(self)
+        self.start_time = self.remaining_total
+
+        
+        self.lcd.display("%d:%02d" % (99,99))
+
+        self.hbox.addWidget(self.lcd)
+        self.setCentralWidget(self.central)
+
+        self.timer.start(1000)
+        self.timer.timeout.connect(self.updateLCD)
+
+    def updateLCD(self):
+        # Update the lcd
+        if self.topup:
+            self.val1 = self.remaining.read().value
+            if self.val1 > 0:
+                self.val1 = self.remaining.read().value
+                self.val2 = self.warmupbooster.read().value
+                self.val3 = self.warmuplinac.read().value
+                self.start_time = self.val1 + self.val2 + self.val3
+                self.lcd.display("%d:%02d" % 
+                                    (self.start_time/60,self.start_time % 60))
+            elif self.val1 == 0:
+                self.start_time -= 1
+                if self.start_time < 0:
+                    self.lcd.display("%d:%02d" % (0,0))
+                else:
+                    self.lcd.display("%d:%02d" % 
+                                    (self.start_time/60,self.start_time % 60))
+        else:
+            self.lcd.display("%d:%02d" % (99,99))
+    
+
+if __name__ == "__main__":
+    import sys
+    app = QApplication(sys.argv)
+    ui = MyMainWindow()
+    ui.show()
+    sys.exit(app.exec_())
+
